@@ -1,0 +1,682 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>Virtual Node Suite - Trustless Bitcoin Verification</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        neon: {
+                            cyan: '#00f3ff',
+                            blue: '#0099ff',
+                            purple: '#a78bfa',
+                            btc: '#f7931a',
+                            dark: '#0a0714',
+                            glass: 'rgba(20, 15, 38, 0.65)'
+                        }
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                        mono: ['Fira Code', 'Courier New', 'monospace'],
+                        cyber: ['Orbitron', 'sans-serif']
+                    },
+                    boxShadow: {
+                        'neon-cyan': '0 0 20px rgba(0, 243, 255, 0.4), inset 0 0 10px rgba(0, 243, 255, 0.2)',
+                        'neon-blue': '0 0 20px rgba(0, 153, 255, 0.4), inset 0 0 10px rgba(0, 153, 255, 0.2)',
+                        'neon-btc': '0 0 25px rgba(247, 147, 26, 0.5)'
+                    }
+                }
+            }
+        }
+    </script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;600&family=Orbitron:wght@500;700;900&family=Inter:wght@300;400;600;800&display=swap" rel="stylesheet">
+    <style>
+        body {
+            background-color: #07040d;
+            color: #e2e8f0;
+            overflow-x: hidden;
+            font-family: 'Inter', sans-serif;
+        }
+
+        .scanline-overlay {
+            background: linear-gradient(
+                rgba(18, 16, 16, 0) 50%,
+                rgba(0, 0, 0, 0.25) 50%
+            ), linear-gradient(
+                90deg,
+                rgba(0, 0, 255, 0.03),
+                rgba(0, 150, 255, 0.01),
+                rgba(0, 0, 255, 0.03)
+            );
+            background-size: 100% 4px, 6px 100%;
+            pointer-events: none;
+        }
+
+        .text-glow-cyan {
+            text-shadow: 0 0 8px rgba(0, 243, 255, 0.7), 0 0 20px rgba(0, 243, 255, 0.4);
+        }
+
+        .text-glow-blue {
+            text-shadow: 0 0 8px rgba(0, 153, 255, 0.7), 0 0 20px rgba(0, 153, 255, 0.4);
+        }
+
+        .text-glow-btc {
+            text-shadow: 0 0 10px rgba(247, 147, 26, 0.8), 0 0 25px rgba(247, 147, 26, 0.4);
+        }
+
+        .glass-panel {
+            background: rgba(18, 12, 36, 0.65);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid rgba(0, 243, 255, 0.2);
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.5);
+        }
+
+        .glass-panel-blue {
+            background: rgba(10, 20, 40, 0.65);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid rgba(0, 153, 255, 0.25);
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.5);
+        }
+
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #0a0714;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #2a1b4e;
+            border-radius: 4px;
+            border: 1px solid #00f3ff;
+        }
+
+        @keyframes floatSlow {
+            0%, 100% { transform: translateY(0px) rotate(0deg); }
+            50% { transform: translateY(-15px) rotate(1.5deg); }
+        }
+
+        @keyframes pulseGlow {
+            0%, 100% { opacity: 0.8; filter: drop-shadow(0 0 15px rgba(247, 147, 26, 0.6)); }
+            50% { opacity: 1; filter: drop-shadow(0 0 30px rgba(247, 147, 26, 0.9)); }
+        }
+
+        .animate-float {
+            animation: floatSlow 6s ease-in-out infinite;
+        }
+
+        .btc-glow-anim {
+            animation: pulseGlow 3s ease-in-out infinite;
+        }
+    </style>
+</head>
+<body class="relative min-h-screen selection:bg-blue-500 selection:text-white">
+
+    <canvas id="bgCanvas" class="fixed top-0 left-0 w-full h-full z-0 pointer-events-none"></canvas>
+    <div class="scanline-overlay fixed top-0 left-0 w-full h-full z-10"></div>
+
+    <div class="relative z-20 flex flex-col min-h-screen">
+
+        <!-- HEADER -->
+        <header class="w-full border-b border-cyan-900/40 glass-panel sticky top-0 z-50 px-4 lg:px-8 py-3.5">
+            <div class="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-4">
+                <div class="flex items-center space-x-3 cursor-pointer group">
+                    <div class="relative w-10 h-10 flex items-center justify-center rounded-xl bg-gradient-to-br from-neon-cyan to-neon-blue p-0.5 group-hover:shadow-neon-cyan transition-all duration-300">
+                        <div class="w-full h-full bg-slate-950 rounded-[10px] flex items-center justify-center">
+                            <svg class="w-6 h-6 text-neon-cyan animate-pulse" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <circle cx="12" cy="12" r="9" stroke-width="2"/>
+                                <path stroke-width="2" d="M8 12h8M12 8v8"/>
+                            </svg>
+                        </div>
+                    </div>
+                    <div>
+                        <span class="font-cyber text-xl font-bold tracking-wider text-transparent bg-clip-text bg-gradient-to-r from-neon-cyan via-white to-neon-blue text-glow-cyan">
+                            VIRTUAL<span class="text-neon-blue">NODE</span>
+                        </span>
+                        <span class="text-[10px] block font-mono text-cyan-400/80 tracking-widest uppercase">Suite // Trustless Verification</span>
+                    </div>
+                </div>
+
+                <div class="hidden md:flex items-center px-3 py-1.5 rounded-full border border-cyan-500/30 bg-cyan-950/40 text-xs font-mono text-cyan-300 gap-2 shadow-inner">
+                    <span class="relative flex h-2 w-2">
+                        <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                        <span class="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                    </span>
+                    <span>NODE OPERATIONAL</span>
+                    <span class="text-neon-blue font-bold">| &lt;8ms LATENCY</span>
+                </div>
+            </div>
+        </header>
+
+        <!-- HERO SECTION -->
+        <section class="relative pt-12 pb-20 px-4 max-w-7xl mx-auto w-full flex-grow flex flex-col justify-center items-center text-center">
+
+            <!-- FLOATING GHOST MASCOT -->
+            <div class="relative my-4 animate-float group cursor-pointer" onclick="triggerGhostSparkles()">
+                <div class="absolute -inset-4 rounded-full bg-gradient-to-r from-neon-blue via-purple-600 to-neon-cyan blur-2xl opacity-40 group-hover:opacity-75 transition-opacity duration-500"></div>
+
+                <svg class="w-48 h-48 md:w-60 md:h-60 relative z-10 filter drop-shadow-[0_0_20px_rgba(0,243,255,0.4)]" viewBox="0 0 200 200" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <!-- Ghost Body -->
+                    <path d="M100 20C65 20 40 45 40 85C40 135 30 155 45 165C60 175 70 155 85 165C100 175 110 155 125 165C140 175 150 155 165 165C175 150 160 135 160 85C160 45 135 20 100 20Z"
+                          fill="url(#ghostGrad)"
+                          stroke="#00f3ff"
+                          stroke-width="2.5"
+                          opacity="0.92"/>
+
+                    <!-- Cyber Eyes -->
+                    <circle cx="80" cy="70" r="8" fill="none" stroke="#00f3ff" stroke-width="2"/>
+                    <circle cx="80" cy="70" r="5" fill="#00f3ff" opacity="0.8"/>
+                    <circle cx="120" cy="70" r="8" fill="none" stroke="#00f3ff" stroke-width="2"/>
+                    <circle cx="120" cy="70" r="5" fill="#00f3ff" opacity="0.8"/>
+
+                    <!-- Ghost Arms holding Coin -->
+                    <path d="M50 105 C 65 115, 80 120, 90 130" stroke="#00f3ff" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+                    <path d="M150 105 C 135 115, 120 120, 110 130" stroke="#00f3ff" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+
+                    <!-- Glowing Bitcoin Coin -->
+                    <g class="btc-glow-anim" transform="translate(100, 145)">
+                        <circle cx="0" cy="0" r="28" fill="#f7931a" opacity="0.2"/>
+                        <circle cx="0" cy="0" r="24" fill="url(#btcCoinGrad)" stroke="#ffe17d" stroke-width="2"/>
+                        <circle cx="0" cy="0" r="20" fill="none" stroke="#b86300" stroke-width="1" stroke-dasharray="4 2"/>
+                        <text x="0" y="8" font-size="16" font-weight="bold" text-anchor="middle" fill="#ffffff">₿</text>
+                    </g>
+
+                    <!-- Code Particles -->
+                    <text x="30" y="50" fill="#00f3ff" font-family="monospace" font-size="10" opacity="0.7">0101</text>
+                    <text x="145" y="45" fill="#0099ff" font-family="monospace" font-size="10" opacity="0.7">NODE</text>
+                    <text x="155" y="155" fill="#00f3ff" font-family="monospace" font-size="10" opacity="0.7">µ-node</text>
+
+                    <defs>
+                        <linearGradient id="ghostGrad" x1="40" y1="20" x2="160" y2="170" gradientUnits="userSpaceOnUse">
+                            <stop offset="0%" stop-color="#1e1035"/>
+                            <stop offset="50%" stop-color="#0f2642"/>
+                            <stop offset="100%" stop-color="#070a18"/>
+                        </linearGradient>
+                        <linearGradient id="btcCoinGrad" x1="-20" y1="-20" x2="20" y2="20" gradientUnits="userSpaceOnUse">
+                            <stop offset="0%" stop-color="#ffb834"/>
+                            <stop offset="50%" stop-color="#f7931a"/>
+                            <stop offset="100%" stop-color="#9c5400"/>
+                        </linearGradient>
+                    </defs>
+                </svg>
+            </div>
+
+            <div class="inline-block px-4 py-1.5 mb-4 rounded-full border border-neon-blue/40 bg-neon-blue/10 text-neon-blue text-xs font-mono tracking-widest uppercase shadow-neon-blue">
+                ⚡ Trustless Bitcoin Verification Engine
+            </div>
+
+            <h1 class="font-cyber text-4xl sm:text-6xl lg:text-7xl font-black tracking-tight mb-4 text-transparent bg-clip-text bg-gradient-to-r from-neon-cyan via-white to-neon-blue text-glow-cyan leading-tight">
+                Virtual Node Suite
+            </h1>
+
+            <h2 class="text-xl sm:text-2xl font-mono text-neon-blue font-semibold mb-6 text-glow-blue">
+                Bitcoin Transaction Control without a Trusted Third Party
+            </h2>
+
+            <p class="max-w-2xl text-slate-300 text-sm sm:text-base md:text-lg leading-relaxed mb-8 font-sans">
+                Query 10+ independent sources with cryptographic proofs. Multi-source consensus, automatic lie detection, zero infrastructure burden.
+            </p>
+
+            <!-- Stats Bar -->
+            <div class="mt-12 grid grid-cols-2 md:grid-cols-4 gap-4 w-full max-w-4xl text-left">
+                <div class="glass-panel p-4 rounded-xl border-l-2 border-l-neon-cyan">
+                    <div class="text-xs font-mono text-slate-400">INDEPENDENT SOURCES</div>
+                    <div class="font-cyber text-2xl text-neon-cyan font-bold mt-1">10+ Peers</div>
+                </div>
+                <div class="glass-panel p-4 rounded-xl border-l-2 border-l-neon-blue">
+                    <div class="text-xs font-mono text-slate-400">STORAGE</div>
+                    <div class="font-cyber text-2xl text-neon-blue font-bold mt-1">&lt;1GB</div>
+                </div>
+                <div class="glass-panel p-4 rounded-xl border-l-2 border-l-neon-btc">
+                    <div class="text-xs font-mono text-slate-400">VERIFICATION</div>
+                    <div class="font-cyber text-2xl text-neon-btc font-bold mt-1">1-3 sec</div>
+                </div>
+                <div class="glass-panel p-4 rounded-xl border-l-2 border-l-purple-500">
+                    <div class="text-xs font-mono text-slate-400">TRUST MODEL</div>
+                    <div class="font-cyber text-2xl text-purple-300 font-bold mt-1">Consensus</div>
+                </div>
+            </div>
+        </section>
+
+        <!-- NODE ARCHITECTURE SECTION -->
+        <section class="py-16 px-4 max-w-7xl mx-auto w-full">
+            <div class="text-center mb-12">
+                <h2 class="font-cyber text-3xl md:text-5xl font-black text-transparent bg-clip-text bg-gradient-to-r from-neon-cyan to-neon-blue text-glow-cyan mb-3">
+                    Trustless Bitcoin at Every Level
+                </h2>
+                <p class="font-mono text-xs md:text-sm text-cyan-300/80">
+                    // FULL NODE REMAINS BEST. VIRTUAL NODE IS THE BEST ALTERNATIVE.
+                </p>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6 items-start">
+
+                <!-- FULL NODE: GOLD STANDARD -->
+                <div class="glass-panel p-6 md:p-8 rounded-2xl border-2 border-neon-btc hover:border-neon-cyan transition-all duration-300 flex flex-col justify-between group relative">
+                    <div class="absolute -top-3 left-1/2 transform -translate-x-1/2 bg-gradient-to-r from-neon-btc to-yellow-500 px-3 py-1 rounded-full text-xs font-mono font-bold text-black">
+                        GOLD STANDARD
+                    </div>
+
+                    <div>
+                        <div class="flex items-center justify-between mb-6 mt-4">
+                            <h3 class="font-cyber text-xl md:text-2xl font-bold text-neon-btc">Full Node</h3>
+                            <span class="px-3 py-1 rounded-full text-xs font-mono font-semibold bg-neon-btc/20 text-neon-btc">100% TRUSTLESS</span>
+                        </div>
+
+                        <ul class="space-y-4 font-mono text-sm text-slate-300 mb-8">
+                            <li class="flex items-start space-x-3">
+                                <span class="text-emerald-400 font-bold">✓</span>
+                                <span>Validate every block's Proof-of-Work</span>
+                            </li>
+                            <li class="flex items-start space-x-3">
+                                <span class="text-emerald-400 font-bold">✓</span>
+                                <span>Complete blockchain verification</span>
+                            </li>
+                            <li class="flex items-start space-x-3">
+                                <span class="text-slate-500 font-bold">–</span>
+                                <span class="text-slate-400">Requires <strong class="text-slate-200">500GB+ SSD</strong></span>
+                            </li>
+                            <li class="flex items-start space-x-3">
+                                <span class="text-slate-500 font-bold">–</span>
+                                <span class="text-slate-400"><strong class="text-slate-200">Days to sync</strong></span>
+                            </li>
+                            <li class="flex items-start space-x-3">
+                                <span class="text-slate-500 font-bold">–</span>
+                                <span class="text-slate-400">24/7 power & bandwidth</span>
+                            </li>
+                        </ul>
+                    </div>
+
+                    <div class="pt-4 border-t border-slate-800/80 text-xs font-mono text-slate-500">
+                        Best for: Miners, exchanges, serious infrastructure
+                    </div>
+                </div>
+
+                <!-- VIRTUAL NODE: BEST ALTERNATIVE -->
+                <div class="glass-panel-blue p-6 md:p-8 rounded-2xl border-2 border-neon-cyan/50 hover:border-neon-cyan transition-all duration-300 shadow-neon-cyan flex flex-col justify-between relative overflow-visible group">
+                    <div class="absolute -right-12 -top-12 w-32 h-32 bg-neon-cyan/20 rounded-full blur-xl group-hover:bg-neon-blue/30 transition-all duration-500"></div>
+
+                    <div class="absolute top-0 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-gradient-to-r from-neon-cyan to-neon-blue px-4 py-1.5 rounded-full text-xs font-mono font-bold text-slate-950 whitespace-nowrap z-50">
+                        🎯 BEST ALTERNATIVE
+                    </div>
+
+                    <div>
+                        <div class="flex items-center justify-between mb-6 mt-4">
+                            <h3 class="font-cyber text-xl md:text-2xl font-bold text-white text-glow-cyan">Virtual Node Suite</h3>
+                            <span class="px-3 py-1 rounded-full text-xs font-mono font-bold bg-neon-cyan/20 text-neon-cyan border border-neon-cyan shadow-neon-cyan">
+                                TRUSTLESS
+                            </span>
+                        </div>
+
+                        <ul class="space-y-4 font-mono text-sm text-slate-200 mb-8">
+                            <li class="flex items-start space-x-3">
+                                <span class="text-emerald-400 font-bold">✓</span>
+                                <span>Query 10+ independent peers</span>
+                            </li>
+                            <li class="flex items-start space-x-3">
+                                <span class="text-emerald-400 font-bold">✓</span>
+                                <span>Consensus voting + blacklisting</span>
+                            </li>
+                            <li class="flex items-start space-x-3">
+                                <span class="text-emerald-400 font-bold">✓</span>
+                                <span><strong class="text-neon-cyan">&lt;1GB RAM / 100MB Storage</strong></span>
+                            </li>
+                            <li class="flex items-start space-x-3">
+                                <span class="text-emerald-400 font-bold">✓</span>
+                                <span><strong class="text-neon-cyan">Instant verification</strong></span>
+                            </li>
+                            <li class="flex items-start space-x-3">
+                                <span class="text-emerald-400 font-bold">✓</span>
+                                <span>Works on Raspberry Pi, mobile, browser</span>
+                            </li>
+                        </ul>
+                    </div>
+
+                    <div class="pt-4 border-t border-cyan-900/50 flex items-center justify-between text-xs font-mono text-cyan-300">
+                        <span>Optimal for: Wallets, IoT, developers</span>
+                        <span class="text-neon-cyan font-bold animate-pulse">RECOMMENDED</span>
+                    </div>
+                </div>
+
+                <!-- BOTH: MAXIMUM SECURITY -->
+                <div class="glass-panel p-6 md:p-8 rounded-2xl border-2 border-purple-500/50 hover:border-purple-400 transition-all duration-300 flex flex-col justify-between group relative">
+                    <div class="absolute -top-3 left-1/2 transform -translate-x-1/2 bg-gradient-to-r from-purple-500 to-pink-500 px-3 py-1 rounded-full text-xs font-mono font-bold text-white">
+                        MAXIMUM SECURITY
+                    </div>
+
+                    <div>
+                        <div class="flex items-center justify-between mb-6 mt-4">
+                            <h3 class="font-cyber text-xl md:text-2xl font-bold text-purple-300">Full Node + Virtual Node</h3>
+                            <span class="px-3 py-1 rounded-full text-xs font-mono font-semibold bg-purple-500/20 text-purple-300">BOTH</span>
+                        </div>
+
+                        <ul class="space-y-4 font-mono text-sm text-slate-300 mb-8">
+                            <li class="flex items-start space-x-3">
+                                <span class="text-emerald-400 font-bold">✓</span>
+                                <span>Local full node validates everything</span>
+                            </li>
+                            <li class="flex items-start space-x-3">
+                                <span class="text-emerald-400 font-bold">✓</span>
+                                <span>Virtual Node as sibling verification</span>
+                            </li>
+                            <li class="flex items-start space-x-3">
+                                <span class="text-emerald-400 font-bold">✓</span>
+                                <span>Compare peer consensus vs local PoW</span>
+                            </li>
+                            <li class="flex items-start space-x-3">
+                                <span class="text-emerald-400 font-bold">✓</span>
+                                <span>Defense-in-depth architecture</span>
+                            </li>
+                            <li class="flex items-start space-x-3">
+                                <span class="text-emerald-400 font-bold">✓</span>
+                                <span>Detect network attacks & censorship</span>
+                            </li>
+                        </ul>
+                    </div>
+
+                    <div class="pt-4 border-t border-slate-800/80 text-xs font-mono text-slate-500">
+                        Best for: Maximum paranoia, institutional security
+                    </div>
+                </div>
+
+            </div>
+        </section>
+
+        <!-- CORE FEATURES -->
+        <section class="py-16 px-4 max-w-7xl mx-auto w-full">
+            <div class="text-center mb-12">
+                <h2 class="font-cyber text-3xl md:text-5xl font-black text-transparent bg-clip-text bg-gradient-to-r from-neon-cyan to-neon-blue text-glow-cyan mb-3">
+                    16 Core Features
+                </h2>
+                <p class="font-mono text-xs md:text-sm text-cyan-300/80">
+                    Trustless verification • Multi-source consensus • Cryptographic proofs • Emergency sweeps • Quorum approvals
+                </p>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+
+                <div class="glass-panel p-6 rounded-2xl border border-cyan-500/20 hover:border-neon-cyan transition-all duration-300 group">
+                    <div class="w-12 h-12 rounded-xl bg-neon-cyan/10 border border-neon-cyan/40 flex items-center justify-center text-neon-cyan text-2xl mb-4 group-hover:scale-110 transition-transform">🔐</div>
+                    <h3 class="font-cyber text-lg font-bold text-white mb-2">Cryptographic Proofs</h3>
+                    <p class="text-slate-400 text-xs leading-relaxed">RSA-4096 signatures. Merkle proofs. OP_RETURN anchoring. Verify without 500GB.</p>
+                </div>
+
+                <div class="glass-panel p-6 rounded-2xl border border-blue-500/20 hover:border-neon-blue transition-all duration-300 group">
+                    <div class="w-12 h-12 rounded-xl bg-neon-blue/10 border border-neon-blue/40 flex items-center justify-center text-neon-blue text-2xl mb-4 group-hover:scale-110 transition-transform">🌐</div>
+                    <h3 class="font-cyber text-lg font-bold text-white mb-2">Multi-Peer Consensus</h3>
+                    <p class="text-slate-400 text-xs leading-relaxed">Query 10+ independent sources. Auto-detect lying nodes. Self-healing network.</p>
+                </div>
+
+                <div class="glass-panel p-6 rounded-2xl border border-yellow-500/20 hover:border-neon-btc transition-all duration-300 group">
+                    <div class="w-12 h-12 rounded-xl bg-neon-btc/10 border border-neon-btc/40 flex items-center justify-center text-neon-btc text-2xl mb-4 group-hover:scale-110 transition-transform">⚡</div>
+                    <h3 class="font-cyber text-lg font-bold text-white mb-2">Zero Infrastructure</h3>
+                    <p class="text-slate-400 text-xs leading-relaxed">Raspberry Pi friendly. Mobile native. Instant verification. No sync required.</p>
+                </div>
+
+                <div class="glass-panel p-6 rounded-2xl border border-purple-500/20 hover:border-purple-400 transition-all duration-300 group">
+                    <div class="w-12 h-12 rounded-xl bg-purple-500/10 border border-purple-500/40 flex items-center justify-center text-purple-300 text-2xl mb-4 group-hover:scale-110 transition-transform">🔑</div>
+                    <h3 class="font-cyber text-lg font-bold text-white mb-2">Quorum Approvals</h3>
+                    <p class="text-slate-400 text-xs leading-relaxed">M-of-N authorization. Signed logs. Multi-sig workflows. Full audit trail.</p>
+                </div>
+
+                <div class="glass-panel p-6 rounded-2xl border border-pink-500/20 hover:border-pink-400 transition-all duration-300 group">
+                    <div class="w-12 h-12 rounded-xl bg-pink-500/10 border border-pink-500/40 flex items-center justify-center text-pink-300 text-2xl mb-4 group-hover:scale-110 transition-transform">🚨</div>
+                    <h3 class="font-cyber text-lg font-bold text-white mb-2">Emergency Sweep</h3>
+                    <p class="text-slate-400 text-xs leading-relaxed">OP_RETURN signals. Dust triggers. E-Stop button. Bluetooth. Dead man's switch.</p>
+                </div>
+
+                <div class="glass-panel p-6 rounded-2xl border border-green-500/20 hover:border-green-400 transition-all duration-300 group">
+                    <div class="w-12 h-12 rounded-xl bg-green-500/10 border border-green-500/40 flex items-center justify-center text-green-300 text-2xl mb-4 group-hover:scale-110 transition-transform">📡</div>
+                    <h3 class="font-cyber text-lg font-bold text-white mb-2">Privacy Routing</h3>
+                    <p class="text-slate-400 text-xs leading-relaxed">Tor routing. I2P support. Multi-relay broadcasting. Randomized delays.</p>
+                </div>
+
+                <div class="glass-panel p-6 rounded-2xl border border-indigo-500/20 hover:border-indigo-400 transition-all duration-300 group">
+                    <div class="w-12 h-12 rounded-xl bg-indigo-500/10 border border-indigo-500/40 flex items-center justify-center text-indigo-300 text-2xl mb-4 group-hover:scale-110 transition-transform">⏳</div>
+                    <h3 class="font-cyber text-lg font-bold text-white mb-2">Dead Man's Switch</h3>
+                    <p class="text-slate-400 text-xs leading-relaxed">Passive countdown timer. Auto-sweep without active monitoring. Inheritance ready.</p>
+                </div>
+
+                <div class="glass-panel p-6 rounded-2xl border border-teal-500/20 hover:border-teal-400 transition-all duration-300 group">
+                    <div class="w-12 h-12 rounded-xl bg-teal-500/10 border border-teal-500/40 flex items-center justify-center text-teal-300 text-2xl mb-4 group-hover:scale-110 transition-transform">📱</div>
+                    <h3 class="font-cyber text-lg font-bold text-white mb-2">Mobile Notifications</h3>
+                    <p class="text-slate-400 text-xs leading-relaxed">Watchtower alerts. Push notifications. xpub stays private. Balance thresholds.</p>
+                </div>
+
+                <div class="glass-panel p-6 rounded-2xl border border-amber-500/20 hover:border-amber-400 transition-all duration-300 group">
+                    <div class="w-12 h-12 rounded-xl bg-amber-500/10 border border-amber-500/40 flex items-center justify-center text-amber-300 text-2xl mb-4 group-hover:scale-110 transition-transform">✍️</div>
+                    <h3 class="font-cyber text-lg font-bold text-white mb-2">Pre-Signed Txns</h3>
+                    <p class="text-slate-400 text-xs leading-relaxed">Sign now, broadcast later. Known amounts only. Balance monitoring. Address alerts.</p>
+                </div>
+
+                <div class="glass-panel p-6 rounded-2xl border border-rose-500/20 hover:border-rose-400 transition-all duration-300 group">
+                    <div class="w-12 h-12 rounded-xl bg-rose-500/10 border border-rose-500/40 flex items-center justify-center text-rose-300 text-2xl mb-4 group-hover:scale-110 transition-transform">⚙️</div>
+                    <h3 class="font-cyber text-lg font-bold text-white mb-2">Peer & Sibling Config</h3>
+                    <p class="text-slate-400 text-xs leading-relaxed">Choose verification sources. Optional local full node. Defense-in-depth setup.</p>
+                </div>
+
+                <div class="glass-panel p-6 rounded-2xl border border-sky-500/20 hover:border-sky-400 transition-all duration-300 group">
+                    <div class="w-12 h-12 rounded-xl bg-sky-500/10 border border-sky-500/40 flex items-center justify-center text-sky-300 text-2xl mb-4 group-hover:scale-110 transition-transform">📊</div>
+                    <h3 class="font-cyber text-lg font-bold text-white mb-2">Arbitrary Data Fields</h3>
+                    <p class="text-slate-400 text-xs leading-relaxed">Custom metadata. Tax categories. Invoice numbers. Audit trail. Signed receipts.</p>
+                </div>
+
+                <div class="glass-panel p-6 rounded-2xl border border-fuchsia-500/20 hover:border-fuchsia-400 transition-all duration-300 group">
+                    <div class="w-12 h-12 rounded-xl bg-fuchsia-500/10 border border-fuchsia-500/40 flex items-center justify-center text-fuchsia-300 text-2xl mb-4 group-hover:scale-110 transition-transform">🔄</div>
+                    <h3 class="font-cyber text-lg font-bold text-white mb-2">Node Cloning</h3>
+                    <p class="text-slate-400 text-xs leading-relaxed">Geographic replication. Automatic failover. Backup nodes. Distributed setup.</p>
+                </div>
+
+                <div class="glass-panel p-6 rounded-2xl border border-orange-500/20 hover:border-orange-400 transition-all duration-300 group">
+                    <div class="w-12 h-12 rounded-xl bg-orange-500/10 border border-orange-500/40 flex items-center justify-center text-orange-300 text-2xl mb-4 group-hover:scale-110 transition-transform">🛡️</div>
+                    <h3 class="font-cyber text-lg font-bold text-white mb-2">Security Hardening</h3>
+                    <p class="text-slate-400 text-xs leading-relaxed">SSH hardening. Fail2Ban protection. UFW firewall. Umbrel-based security.</p>
+                </div>
+
+                <div class="glass-panel p-6 rounded-2xl border border-lime-500/20 hover:border-lime-400 transition-all duration-300 group">
+                    <div class="w-12 h-12 rounded-xl bg-lime-500/10 border border-lime-500/40 flex items-center justify-center text-lime-300 text-2xl mb-4 group-hover:scale-110 transition-transform">📦</div>
+                    <h3 class="font-cyber text-lg font-bold text-white mb-2">Electrum Compatible</h3>
+                    <p class="text-slate-400 text-xs leading-relaxed">Works with Sparrow Wallet. Wasabi compatible. Standard protocol. Plug-and-play.</p>
+                </div>
+
+                <div class="glass-panel p-6 rounded-2xl border border-violet-500/20 hover:border-violet-400 transition-all duration-300 group">
+                    <div class="w-12 h-12 rounded-xl bg-violet-500/10 border border-violet-500/40 flex items-center justify-center text-violet-300 text-2xl mb-4 group-hover:scale-110 transition-transform">💾</div>
+                    <h3 class="font-cyber text-lg font-bold text-white mb-2">Receipt Export</h3>
+                    <p class="text-slate-400 text-xs leading-relaxed">JSON, PDF, CSV, ZIP formats. Signed receipts. Batch export. Audit archive.</p>
+                </div>
+
+                <div class="glass-panel p-6 rounded-2xl border border-cyan-500/20 hover:border-neon-cyan transition-all duration-300 group">
+                    <div class="w-12 h-12 rounded-xl bg-neon-cyan/10 border border-neon-cyan/40 flex items-center justify-center text-neon-cyan text-2xl mb-4 group-hover:scale-110 transition-transform">🎯</div>
+                    <h3 class="font-cyber text-lg font-bold text-white mb-2">Source Blacklisting</h3>
+                    <p class="text-slate-400 text-xs leading-relaxed">Auto-detect lying nodes. Reputation scoring. Self-healing network. Resilient.</p>
+                </div>
+
+                <div class="glass-panel p-6 rounded-2xl border border-pink-500/20 hover:border-pink-400 transition-all duration-300 group">
+                    <div class="w-12 h-12 rounded-xl bg-pink-500/10 border border-pink-500/40 flex items-center justify-center text-pink-300 text-2xl mb-4 group-hover:scale-110 transition-transform">🌍</div>
+                    <h3 class="font-cyber text-lg font-bold text-white mb-2">Geographic Diversity</h3>
+                    <p class="text-slate-400 text-xs leading-relaxed">Multi-region sources. Geographically distributed. Censorship resistant. Global access.</p>
+                </div>
+
+            </div>
+        </section>
+
+        <!-- COMING SOON SECTION -->
+        <section class="py-16 px-4 max-w-5xl mx-auto w-full text-center">
+            <div class="glass-panel rounded-2xl border-2 border-neon-cyan/50 p-12 relative overflow-hidden group">
+                <div class="absolute -right-12 -top-12 w-32 h-32 bg-neon-cyan/20 rounded-full blur-xl group-hover:bg-neon-blue/30 transition-all duration-500"></div>
+
+                <div class="relative z-10">
+                    <div class="inline-block px-4 py-2 rounded-full border border-neon-cyan/40 bg-neon-cyan/10 text-neon-cyan text-xs font-mono tracking-widest uppercase mb-4">
+                        ⏳ Coming Soon
+                    </div>
+
+                    <h2 class="font-cyber text-3xl md:text-4xl font-black text-transparent bg-clip-text bg-gradient-to-r from-neon-cyan to-neon-blue text-glow-cyan mb-4">
+                        Check for Updates
+                    </h2>
+
+                    <p class="text-slate-300 max-w-2xl mx-auto mb-8 font-sans">
+                        Virtual Node Suite is in active development. Star the GitHub repository to get notified when we launch.
+                    </p>
+
+                    <div class="flex flex-col sm:flex-row gap-4 justify-center">
+                        <a href="https://github.com/sambitcoin/virtualnode" target="_blank" class="inline-flex items-center justify-center gap-2 px-6 py-3 bg-gradient-to-r from-neon-cyan to-cyan-300 hover:from-cyan-300 hover:to-neon-cyan text-slate-950 font-cyber font-bold rounded-xl transition-all shadow-neon-cyan hover:scale-[1.02] active:scale-95">
+                            <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                                <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v 3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/>
+                            </svg>
+                            Star on GitHub
+                        </a>
+
+                        <a href="https://monetarynode.org" target="_blank" class="inline-flex items-center justify-center gap-2 px-6 py-3 border-2 border-neon-blue text-neon-blue font-cyber font-bold rounded-xl hover:bg-neon-blue/10 transition-all shadow-neon-blue hover:scale-[1.02] active:scale-95">
+                            <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                                <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8-3.58 8-8 8zm3.5-9c.83 0 1.5-.67 1.5-1.5S16.33 8 15.5 8 14 8.67 14 9.5s.67 1.5 1.5 1.5zm-7 0c.83 0 1.5-.67 1.5-1.5S9.33 8 8.5 8 7 8.67 7 9.5 7.67 11 8.5 11zm3.5 6.5c2.33 0 4.31-1.46 5.11-3.5H6.89c.8 2.04 2.78 3.5 5.11 3.5z"/>
+                            </svg>
+                            Monetary Node
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- FOOTER -->
+        <footer class="mt-auto border-t border-cyan-900/40 glass-panel py-8 px-4 text-center font-mono text-xs text-slate-500">
+            <div class="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
+                <div class="flex items-center space-x-2">
+                    <span class="text-neon-cyan">VIRTUAL NODE SUITE</span>
+                    <span>— TRUSTLESS BITCOIN CONTROL</span>
+                </div>
+                <div class="flex items-center space-x-6 text-slate-400">
+                    <a href="https://github.com/sambitcoin/virtualnode" target="_blank" class="hover:text-neon-cyan transition-colors">GitHub</a>
+                    <a href="https://monetarynode.org" target="_blank" class="hover:text-neon-blue transition-colors">Monetary Node</a>
+                    <a href="#" class="hover:text-neon-btc transition-colors">Docs</a>
+                </div>
+            </div>
+        </footer>
+
+    </div>
+
+    <script>
+        /* SYNTHWAVE CANVAS BACKGROUND */
+        const canvas = document.getElementById('bgCanvas');
+        const ctx = canvas.getContext('2d');
+
+        let width, height;
+        let gridOffset = 0;
+        let particles = [];
+
+        function resizeCanvas() {
+            width = canvas.width = window.innerWidth;
+            height = canvas.height = window.innerHeight;
+        }
+        window.addEventListener('resize', resizeCanvas);
+        resizeCanvas();
+
+        for(let i = 0; i < 45; i++) {
+            particles.push({
+                x: Math.random() * window.innerWidth,
+                y: Math.random() * window.innerHeight,
+                size: Math.random() * 2 + 0.5,
+                speedY: -(Math.random() * 0.5 + 0.2),
+                speedX: (Math.random() - 0.5) * 0.3,
+                color: Math.random() > 0.5 ? '#00f3ff' : '#0099ff',
+                alpha: Math.random()
+            });
+        }
+
+        function drawBackground() {
+            ctx.clearRect(0, 0, width, height);
+
+            const bgGrad = ctx.createLinearGradient(0, 0, 0, height);
+            bgGrad.addColorStop(0, '#06020e');
+            bgGrad.addColorStop(0.5, '#120a2a');
+            bgGrad.addColorStop(1, '#05020a');
+            ctx.fillStyle = bgGrad;
+            ctx.fillRect(0, 0, width, height);
+
+            const horizonY = height * 0.65;
+
+            const sunGrad = ctx.createRadialGradient(width/2, horizonY - 40, 10, width/2, horizonY - 40, 180);
+            sunGrad.addColorStop(0, 'rgba(0, 243, 255, 0.3)');
+            sunGrad.addColorStop(0.5, 'rgba(0, 153, 255, 0.15)');
+            sunGrad.addColorStop(1, 'transparent');
+            ctx.fillStyle = sunGrad;
+            ctx.beginPath();
+            ctx.arc(width/2, horizonY - 40, 180, 0, Math.PI * 2);
+            ctx.fill();
+
+            ctx.strokeStyle = 'rgba(0, 243, 255, 0.15)';
+            ctx.lineWidth = 1;
+
+            const numLines = 28;
+            for(let i = -numLines; i <= numLines; i++) {
+                ctx.beginPath();
+                ctx.moveTo(width / 2, horizonY);
+                ctx.lineTo(width / 2 + i * (width / numLines) * 2, height);
+                ctx.stroke();
+            }
+
+            gridOffset = (gridOffset + 0.6) % 30;
+            for(let y = horizonY; y < height; y += (y - horizonY + 10) * 0.15) {
+                const lineY = y + gridOffset * ((y - horizonY) / (height - horizonY));
+                if(lineY <= height) {
+                    ctx.strokeStyle = `rgba(0, 153, 255, ${0.1 + ((lineY - horizonY) / (height - horizonY)) * 0.25})`;
+                    ctx.beginPath();
+                    ctx.moveTo(0, lineY);
+                    ctx.lineTo(width, lineY);
+                    ctx.stroke();
+                }
+            }
+
+            ctx.strokeStyle = '#00f3ff';
+            ctx.lineWidth = 1.5;
+            ctx.shadowColor = '#00f3ff';
+            ctx.shadowBlur = 10;
+            ctx.beginPath();
+            ctx.moveTo(0, horizonY);
+            ctx.lineTo(width, horizonY);
+            ctx.stroke();
+            ctx.shadowBlur = 0;
+
+            particles.forEach(p => {
+                p.y += p.speedY;
+                p.x += p.speedX;
+
+                if(p.y < 0) p.y = height;
+                if(p.x < 0) p.x = width;
+                if(p.x > width) p.x = 0;
+
+                ctx.fillStyle = p.color;
+                ctx.globalAlpha = p.alpha;
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+                ctx.fill();
+            });
+            ctx.globalAlpha = 1.0;
+
+            requestAnimationFrame(drawBackground);
+        }
+        drawBackground();
+
+        function triggerGhostSparkles() {
+            for(let i=0; i<8; i++) {
+                particles.push({
+                    x: window.innerWidth / 2 + (Math.random() - 0.5) * 200,
+                    y: window.innerHeight * 0.25 + (Math.random() - 0.5) * 100,
+                    size: Math.random() * 4 + 2,
+                    speedY: -(Math.random() * 2 + 1),
+                    speedX: (Math.random() - 0.5) * 2,
+                    color: '#f7931a',
+                    alpha: 1
+                });
+            }
+        }
+    </script>
+</body>
+</html>
